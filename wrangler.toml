@@ -1,0 +1,19 @@
+name = "image-prompt-guru"
+pages_build_output_dir = "public"
+compatibility_date = "2025-09-01"
+
+# —— 可选：KV 限流绑定 ——
+# 在 Cloudflare 控制台：Workers & Pages → KV → 创建命名空间(任意名，如 rate-limit)
+# 然后在 Pages 项目的 Settings → Bindings → KV namespace 中添加：
+#   Variable name: RATE_LIMIT   (KV namespace: 选你创建的)
+# 未绑定时限流自动跳过，网站仍可正常使用。
+
+[vars]
+ZHIPU_VISION_MODEL = "glm-4v-flash"
+ZHIPU_TEXT_MODEL = "glm-4-flash"
+ZHIPU_IMAGE_MODEL = "cogview-3-flash"
+RATE_LIMIT_DAILY = "30"
+
+# 说明：ZHIPU_IMAGE_MODEL 供 /api/imagine（提示词转图片）使用，同样走智谱免费档。
+# 该接口按产品决策不参与 IP 限流（RATE_LIMIT_DAILY 只约束提示词接口）；
+# 若需限流，见 functions/api/imagine.js 顶部的注释。

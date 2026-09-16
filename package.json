@@ -1,0 +1,14 @@
+{
+  "name": "image-prompt-guru",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Free image/text to AI prompt generator, deployed on Cloudflare Pages with Zhipu free models.",
+  "scripts": {
+    "dev": "wrangler pages dev",
+    "deploy": "wrangler pages deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,2 @@
+# 本地开发用密钥示例：复制为 .dev.vars 并填入真实 Key（.dev.vars 不要提交/分享）
+ZHIPU_API_KEY=sk-在这里填入你的智谱APIKey
