@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="uJHvBzlquevFObSGjPoemw">
   <title>Image to Prompt Generator — Free & No Login</title>
   <meta name="description" content="Convert any image or text idea into professional AI art prompts for Midjourney, DALL·E, Stable Diffusion and Flux. Free, no account needed. 中英双语，免费免登录。" data-page-node-id="QVWocqvtK89FXlbLLaeqA5">
-  <link rel="icon" href="assets/avatar.jpg" data-page-node-id="4VHdB77AzX8hMMaCWoR6AY">
-  <link rel="stylesheet" href="assets/style.css?v=1789699933321" data-page-node-id="iPhDcyqT5Vt4CZ27CGusaR">
+  <link rel="icon" href="assets/avatar.ico" data-page-node-id="4VHdB77AzX8hMMaCWoR6AY">
+  <link rel="stylesheet" href="assets/style.css?v=1789725000402" data-page-node-id="iPhDcyqT5Vt4CZ27CGusaR">
 </head>
 <body data-page-node-id="mKfC50UmaLQ9Me3H7ZAjS1">
   <div class="container" data-page-node-id="IIARiRAnU4jfrlCD5iLFTd">
     <header data-page-node-id="jUrSUcMIWjpI6LfRZqs66X">
       <nav class="nav" data-page-node-id="gsO0ha1EuTPUwpt6steHYa">
-        <a class="logo" href="#" data-page-node-id="wYC0oy6PzcM0lLEs0hoYuS"><img class="logo-img" src="assets/avatar.jpg" alt="logo" data-page-node-id="ocz8JkZNVbQCgL05mAa5tc"></a>
-        <a class="lang-switch" id="lang-switch" href="#" data-page-node-id="WiOTICbv5e8KzOBaRJhHQW">中文</a>
+        <a class="logo" href="#" data-page-node-id="wYC0oy6PzcM0lLEs0hoYuS"><img class="logo-img" src="assets/logo.jpg" alt="logo" data-page-node-id="ocz8JkZNVbQCgL05mAa5tc"></a>
+        <a class="lang-switch" id="lang-switch" data-page-node-id="WiOTICbv5e8KzOBaRJhHQW">中文</a>
       </nav>
     </header>
 
@@ -114,6 +114,19 @@
       </section>
     </main>
   </div>
-  <script src="assets/app.js?v=1789699933321"></script>
+
+  <!-- 大图预览层：点图放大，只有「关闭」与「下载」两个出口 -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true">
+    <div class="lightbox-stage" id="lightbox-stage">
+      <img id="lightbox-img" alt="">
+    </div>
+    <button class="lightbox-close" id="lightbox-close" type="button">✕</button>
+    <div class="lightbox-bar">
+      <p class="lightbox-hint" id="lightbox-hint"></p>
+      <button class="btn-link js-download" id="lightbox-download" type="button"></button>
+    </div>
+  </div>
+
+  <script src="assets/app.js?v=1789725000402"></script>
 </body>
 </html>

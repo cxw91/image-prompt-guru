@@ -171,19 +171,58 @@ textarea#imagine-input:focus { border-color: var(--accent); }
   padding: 10px; display: flex; flex-direction: column; gap: 10px;
 }
 .image-card img { width: 100%; border-radius: 8px; display: block; cursor: zoom-in; background: var(--bg-soft); }
+/* 点图放大：用 button 而非 <a>，点击只在页内开预览层，不再跳转/落盘 */
+.image-card .image-view {
+  display: block; width: 100%; padding: 0; border: none; background: none; cursor: zoom-in;
+}
 .image-card.failed img { display: none; }
 .image-card.failed::after { content: attr(data-failed); color: var(--text-dim); font-size: 13px; padding: 28px 8px; text-align: center; }
-/* 下载按钮：做成链接但视觉与 .copy-btn 一致（下载必须走真实导航，才能带 Content-Disposition 落盘） */
-.image-card .btn-link {
-  align-self: flex-start; display: inline-block; text-decoration: none;
+/* 下载 / 预览层里的操作按钮：做成按钮而非链接——下载必须走 JS，才能在
+   支持的浏览器上调起系统「另存为」让用户选存放路径（<a download> 做不到）。 */
+.btn-link {
+  display: inline-block; text-decoration: none;
   border: 1px solid var(--border); background: var(--bg-soft); color: var(--text);
   border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 12.5px;
+  font-family: inherit;
 }
-.image-card .btn-link:hover { border-color: var(--accent); }
+.btn-link:hover { border-color: var(--accent); }
+.btn-link:disabled { opacity: 0.55; cursor: not-allowed; }
+/* 卡片内左对齐即可；预览层里由 .lightbox-bar 的 align-items 居中 */
+.image-card .btn-link { align-self: flex-start; }
 .image-loading {
   color: var(--text-dim); font-size: 13.5px; padding: 18px; text-align: center;
   border: 1px dashed var(--border); border-radius: 12px;
 }
+
+/* 大图预览层 —— 点图后页内放大，不再新开标签页
+   （上游 CDN 的响应带 Content-Disposition，直接打开会被浏览器落盘成下载） */
+.lightbox { position: fixed; inset: 0; z-index: 100; display: none; background: rgba(4, 7, 13, 0.94); }
+.lightbox.is-open { display: block; }
+/* 遮罩即点击区：底部留出操作条的余地，避免图片压住按钮 */
+.lightbox-stage {
+  position: absolute; inset: 0; padding: 58px 18px 80px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+.lightbox-stage img {
+  max-width: 100%; max-height: 100%; border-radius: 10px; display: block;
+  cursor: default; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+  /* 保留双指缩放让用户看细节；写成 none 反而会禁掉 iOS 上的手势 */
+  touch-action: pinch-zoom;
+}
+.lightbox-close {
+  position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--border); background: rgba(20, 28, 46, 0.85); color: var(--text);
+  font-size: 15px; cursor: pointer; backdrop-filter: blur(4px);
+}
+.lightbox-close:hover { border-color: var(--accent); }
+.lightbox-bar {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 18px 18px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.lightbox-hint { font-size: 12.5px; color: var(--text-dim); text-align: center; }
+/* 「长按保存到相册」只对触屏有意义，JS 在桌面端不写文案，靠 :empty 自动收起 */
+.lightbox-hint:empty { display: none; }
 /* error / notice */
 .notice {
   display: none; margin-top: 14px; padding: 10px 14px; border-radius: 10px; font-size: 13.5px;

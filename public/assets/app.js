@@ -34,6 +34,13 @@
       toImagine: "🎨 Generate image from this prompt",
       imageLabel: "Generated image",
       download: "Download",
+      downloadPreparing: "Preparing…",
+      downloadFailed: "Download failed, please retry.",
+      downloadExpired: "The download link expired — please generate the image again.",
+      downloadTooLarge: "This image is over 8MB, too large to download through this site. Open the preview and save the original image directly.",
+      viewImage: "View larger",
+      closeLabel: "Close",
+      lightboxHint: "Long-press the image to save it to your album",
       imagineFailed: "Preview unavailable",
       errNoPrompt: "Generate a prompt first.",
       errNoImagineInput: "Please enter a prompt first.",
@@ -96,6 +103,13 @@
       toImagine: "🎨 用这个提示词出图",
       imageLabel: "生成的图片",
       download: "下载",
+      downloadPreparing: "准备中…",
+      downloadFailed: "下载失败，请重试。",
+      downloadExpired: "下载链接已过期，请重新出图。",
+      downloadTooLarge: "图片超过 8MB，无法经本站中转下载。请打开大图预览后直接保存原图。",
+      viewImage: "查看大图",
+      closeLabel: "关闭",
+      lightboxHint: "长按图片可保存到相册",
       imagineFailed: "图片加载失败",
       errNoPrompt: "请先生成提示词。",
       errNoImagineInput: "请先输入提示词。",
@@ -193,7 +207,7 @@
   function applyLang() {
     t = I18N[lang];
     document.documentElement.lang = t.htmlLang;
-    document.title = lang === "zh" ? "图片转提示词生成器 — 免费免登录" : "Image to Prompt Generator — Free & No Login";
+    document.title = lang === "zh" ? "提示词,生图工具" : "Prompt, Generator Image Tools";
     try { localStorage.setItem(LANG_KEY, lang); } catch (e) { /* 隐私模式忽略 */ }
 
     $("lang-switch").textContent = t.langBtn;
@@ -223,6 +237,12 @@
     $("to-imagine-btn").textContent = t.toImagine;
     $("history-title").textContent = t.history;
     $("clear-history").textContent = t.clearHistory;
+    lightboxClose.setAttribute("aria-label", t.closeLabel);
+    lightboxDl.textContent = t.download;
+    // 预览层开着时切语言，提示条文案也要跟着换
+    if (lightbox.classList.contains("is-open")) {
+      lightboxHint.textContent = isTouchUI() ? t.lightboxHint : "";
+    }
 
     /* 下拉框重建 */
     var styleSel = $("style-select"), targetSel = $("target-select");
@@ -545,46 +565,215 @@
 
   function renderImages(result) {
     var images = (result && result.images) || [];
-    var downloads = (result && result.downloads) || [];
     var size = (result && result.size) || "";
     var grid = $("image-grid");
     grid.innerHTML = "";
-    if (!images.length) return;
+    // 图片被清空（换提示词 / 出图失败）时预览层里的图也已失效，一并收起
+    if (!images.length) { closeLightbox(); return; }
 
     images.forEach(function (url, i) {
       var card = document.createElement("div");
       card.className = "image-card";
       card.setAttribute("data-failed", t.imagineFailed);
 
-      // 点图看大图：新窗口打开原始地址（<img> 展示不涉及 CORS）
-      var view = document.createElement("a");
-      view.href = url;
-      view.target = "_blank";
-      view.rel = "noopener noreferrer";
+      // 点图看大图：改为页内遮罩放大，不再 target="_blank" 打开原图——
+      // 上游 CDN 的响应带 Content-Disposition，直接打开会被浏览器落盘成下载。
+      var view = document.createElement("button");
+      view.type = "button";
+      view.className = "image-view";
+      view.title = t.viewImage;
+      view.setAttribute("aria-label", size ? t.viewImage + " " + size : t.viewImage);
       var img = document.createElement("img");
       img.src = url;
       img.alt = size ? t.imageLabel + " " + size : t.imageLabel;
       img.loading = "lazy";
       img.addEventListener("error", function () { card.classList.add("failed"); });
       view.appendChild(img);
+      view.addEventListener("click", function () { openLightbox(i); });
 
-      // 下载走同源签名地址：上游 CDN 无 CORS 头，跨源直链既 fetch 不了、
-      // download 属性也会被忽略；同理这里不设 download（其取值会覆盖服务端
-      // 推断出的真实扩展名），直接依赖 /api/img 的 Content-Disposition 落盘。
-      // 统一 _blank：签名过期时响应是错误 JSON，若在本文档打开会把整个页面
-      // 顶掉，新窗口打开则只是多一个标签页。
-      var dl = document.createElement("a");
-      dl.className = "btn-link";
-      dl.href = downloads[i] || url; // 签名地址缺失时退化为新窗口打开原图
+      // 下载：走 button + JS 而非 <a download>。跨源地址的 download 属性会被忽略，
+      // 且只有走 JS 取到 blob，才能在支持的浏览器上调起系统「另存为」选择存放路径。
+      var dl = document.createElement("button");
+      dl.type = "button";
+      dl.className = "btn-link js-download";
       dl.textContent = t.download;
-      dl.target = "_blank";
-      dl.rel = "noopener noreferrer";
+      dl.addEventListener("click", function () { downloadImage(i); });
 
       card.appendChild(view);
       card.appendChild(dl);
       grid.appendChild(card);
     });
   }
+
+  /* ---------- 下载：能弹「另存为」就弹，不能则静默落盘 ---------- */
+
+  var downloading = false; // 下载进行中标记，避免连点弹出多个保存框
+
+  /**
+   * 手机 / 平板判定。
+   * 只认「悬停不可用 + 粗指针」，不用 maxTouchPoints —— 后者会把带触摸屏的
+   * Windows 笔记本一并算作移动端，导致桌面端误显示「长按保存」提示。
+   */
+  function isTouchUI() {
+    return !!(window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches);
+  }
+
+  /** 从 Content-Disposition 还原服务端定的文件名；响应头缺失时按 MIME 兜底 */
+  function filenameFromHeaders(disposition, mime) {
+    var m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition || "");
+    if (m && m[1]) {
+      try { return decodeURIComponent(m[1].trim()); } catch (e) { return m[1].trim(); }
+    }
+    var ext = /png/.test(mime || "") ? "png" : /webp/.test(mime || "") ? "webp" : "jpg";
+    return "cogview-" + Date.now() + "." + ext;
+  }
+
+  /**
+   * showSaveFilePicker 的 types 参数。扩展名必须与 MIME 自洽，否则 Chrome 会直接抛错；
+   * 魔数嗅探失败时上游类型是 application/octet-stream，这种情况干脆不传 types。
+   */
+  function savePickerTypes(name, mime) {
+    if (!/^image\/(jpeg|png|webp)$/.test(mime || "")) return undefined;
+    var em = /\.([a-z0-9]+)$/i.exec(name || "");
+    var accept = {};
+    accept[mime] = [em ? "." + em[1].toLowerCase() : "." + mime.slice(6).replace("jpeg", "jpg")];
+    return [{ description: "Image", accept: accept }];
+  }
+
+  /** 所有下载按钮统一切「准备中」并禁用（卡片上的和预览层里的都算） */
+  function setDownloadBusy(on) {
+    var buttons = document.querySelectorAll(".js-download");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].disabled = on;
+      buttons[i].textContent = on ? t.downloadPreparing : t.download;
+    }
+  }
+
+  /** 退化路径：浏览器默认下载目录（Safari / Firefox / 移动端） */
+  function saveViaAnchor(blob, name) {
+    var objectUrl = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = name;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // 立刻 revoke 会让部分浏览器来不及取数据，留一段时间再释放
+    setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 30000);
+    return Promise.resolve();
+  }
+
+  /**
+   * 落盘。
+   *
+   * 只在桌面 Chrome / Edge 上能弹真正的系统「另存为」——File System Access API
+   * 由 Chromium 独有；Safari 与 Firefox 没有任何 API 能强制弹出保存路径对话框，
+   * 只能退化到浏览器默认下载目录（用户可在浏览器设置里开「下载前询问保存位置」）。
+   */
+  function saveBlob(blob, name) {
+    if (!window.showSaveFilePicker) return saveViaAnchor(blob, name);
+    return window.showSaveFilePicker({ suggestedName: name, types: savePickerTypes(name, blob.type) })
+      .then(function (handle) {
+        return handle.createWritable().then(function (writable) {
+          return writable.write(blob).then(function () { return writable.close(); });
+        });
+      })
+      .catch(function (e) {
+        // 用户自己在保存框里点了取消 —— 原样抛出，交给调用方静默处理
+        if (e && e.name === "AbortError") throw e;
+        // 其他失败（策略拦截、激活已过期等）退化为默认下载，不能让按钮点了没反应
+        return saveViaAnchor(blob, name);
+      });
+  }
+
+  /**
+   * 统一下载入口。
+   *
+   * 为什么要先 fetch 成 blob：/api/img 带 Content-Disposition: attachment，直接导航
+   * 只会触发下载、拿不到文件对象，也就没法交给 showSaveFilePicker 让用户选路径。
+   * 同源地址，fetch 无 CORS 问题。
+   */
+  function downloadImage(index) {
+    var r = lastResult;
+    var signed = r && r.downloads && r.downloads[index];
+    if (!signed) {
+      // 签名地址缺失时退化为新窗口打开原图，至少别让按钮点了没反应
+      var raw = r && r.images && r.images[index];
+      if (raw) window.open(raw, "_blank", "noopener");
+      return;
+    }
+    if (downloading) return;
+    downloading = true;
+    setDownloadBusy(true);
+
+    fetch(signed)
+      .then(function (res) {
+        if (!res.ok) {
+          var err = new Error("HTTP " + res.status);
+          err.status = res.status;
+          throw err;
+        }
+        var name = filenameFromHeaders(res.headers.get("Content-Disposition"), res.headers.get("Content-Type"));
+        return res.blob().then(function (blob) { return { blob: blob, name: name }; });
+      })
+      .then(function (got) { return saveBlob(got.blob, got.name); })
+      .catch(function (e) {
+        if (e && e.name === "AbortError") return; // 用户取消保存，不是错误
+        if (e && e.status === 403) { showNotice(t.downloadExpired); return; }
+        if (e && e.status === 413) { showNotice(t.downloadTooLarge); return; }
+        showNotice(t.downloadFailed);
+      })
+      .finally(function () {
+        downloading = false;
+        setDownloadBusy(false);
+      });
+  }
+
+  /* ---------- 大图预览层 ---------- */
+
+  var lightbox = $("lightbox"), lightboxStage = $("lightbox-stage");
+  var lightboxImg = $("lightbox-img"), lightboxHint = $("lightbox-hint");
+  var lightboxClose = $("lightbox-close"), lightboxDl = $("lightbox-download");
+  var lightboxIndex = -1;
+
+  function openLightbox(index) {
+    var r = lastResult;
+    var url = r && r.images && r.images[index];
+    if (!url) return;
+    lightboxIndex = index;
+    lightboxImg.src = url;
+    lightboxImg.alt = r.size ? t.imageLabel + " " + r.size : t.imageLabel;
+    lightboxDl.textContent = t.download;
+    lightboxDl.disabled = false;
+    // 桌面端右键「图片另存为」即可，不需要这条提示；只在触屏设备上写文案
+    lightboxHint.textContent = isTouchUI() ? t.lightboxHint : "";
+    lightbox.classList.add("is-open");
+    // 遮罩打开时锁住页面滚动。html 与 body 都要锁：只设 body 在 iOS Safari 上不生效
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    lightboxClose.focus();
+  }
+
+  function closeLightbox() {
+    if (!lightbox.classList.contains("is-open")) return;
+    lightbox.classList.remove("is-open");
+    document.documentElement.style.overflow = "";
+    document.body.style.overflow = "";
+    lightboxImg.removeAttribute("src"); // 大图占内存，关了直接释放
+    lightboxIndex = -1;
+  }
+
+  lightboxImg.addEventListener("error", closeLightbox); // 原图链接失效时别留个破图遮罩
+  lightboxClose.addEventListener("click", closeLightbox);
+  // 只有点在遮罩空白处才关闭；点图片本身不关，方便长按 / 右键保存
+  lightboxStage.addEventListener("click", function (e) {
+    if (e.target === lightboxStage) closeLightbox();
+  });
+  lightboxDl.addEventListener("click", function () { downloadImage(lightboxIndex); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeLightbox();
+  });
 
   /**
    * 出图主流程。由共享的 #generate-btn（生图模式）与「用这个提示词出图」共用。
@@ -597,6 +786,7 @@
     hideNotice();
     drawing = true;
     syncMode();
+    closeLightbox(); // 新一轮出图会整组替换图片，预览层里的旧图先收起
     var size = $("size-select").value;
     var count = parseInt($("count-select").value, 10) || 1;
 
