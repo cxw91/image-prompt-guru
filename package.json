@@ -6,6 +6,7 @@
   "description": "Free image/text to AI prompt generator, deployed on Cloudflare Pages with Zhipu free models.",
   "scripts": {
     "dev": "wrangler pages dev",
+	"predeploy": "node update-version.js",
     "deploy": "wrangler pages deploy"
   },
   "devDependencies": {
